@@ -3,109 +3,109 @@
 Hay demasiado ruido en internet para seguir el ritmo de la industria tech. Pregonero lo filtra por ti: cada mañana recibe en Telegram un digest con los lanzamientos, herramientas y artículos técnicos que realmente valen la pena — sin tutoriales básicos, sin noticias de negocio, sin ruido.
 
 ```
-RSS feeds → fetch → deduplicate → LLM filter → Telegram digest
+RSS feeds → fetch → deduplicar → filtro LLM → digest en Telegram
 ```
 
-## How it works
+## Cómo funciona
 
-1. **Fetch** — pulls items from 11 RSS/Atom feeds (Hacker News, GitHub Blog, Changelog, Reddit, dev.to, Lobsters, GitHub Trending). Items older than 24h are skipped.
-2. **Deduplicate** — skips any URL already stored in the local SQLite database.
-3. **Filter** — sends each new item to Groq (llama-3.3-70b-versatile), which approves or rejects based on a strict classifier prompt targeting a senior AI-focused engineer.
-4. **Publish** — all approved items are grouped into a single Telegram digest with 3 bullet points each: what it is, why it matters, one concrete takeaway. Output is in Spanish.
-5. **Store** — every processed item (approved, rejected, or error) is saved to SQLite to prevent reprocessing.
+1. **Fetch** — obtiene items de 11 fuentes RSS/Atom (Hacker News, GitHub Blog, Changelog, Reddit, dev.to, Lobsters, GitHub Trending). Se descartan items con más de 24h de antigüedad.
+2. **Deduplicación** — ignora cualquier URL ya procesada, almacenada en una base de datos SQLite local.
+3. **Filtro** — envía cada item nuevo a Groq (llama-3.3-70b-versatile), que aprueba o rechaza según un clasificador estricto orientado a ingenieros senior de IA.
+4. **Publicación** — todos los items aprobados se agrupan en un único digest de Telegram con 3 bullets cada uno: qué es, por qué importa y un caso de uso concreto. El output es en español.
+5. **Almacenamiento** — cada item procesado (aprobado, rechazado o con error) se guarda en SQLite para evitar reprocesamiento.
 
-## Requirements
+## Requisitos
 
 - [Bun](https://bun.sh) >= 1.0
-- Groq API key
-- Telegram bot token + chat ID
+- API key de Groq
+- Token de bot de Telegram + chat ID
 
-## Setup
+## Instalación
 
 ```bash
-# Install dependencies
+# Instalar dependencias
 bun install
 
-# Configure environment
+# Configurar entorno
 cp .env.example .env
-# Edit .env and fill in GROQ_API_KEY, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
+# Editar .env y rellenar GROQ_API_KEY, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
 ```
 
-## Usage
+## Uso
 
 ```bash
-# Start the scheduler (runs immediately, then follows CRON_SCHEDULE)
+# Iniciar el scheduler (ejecuta inmediatamente y luego sigue CRON_SCHEDULE)
 bun start
 
-# Run the pipeline once and exit
+# Ejecutar el pipeline una vez y salir
 bun run-now
 
-# Development mode (auto-restarts on file changes)
+# Modo desarrollo (reinicia automáticamente al cambiar archivos)
 bun dev
 
-# Type check
+# Verificación de tipos
 bun typecheck
 ```
 
-## Environment variables
+## Variables de entorno
 
-| Variable | Default | Description |
+| Variable | Por defecto | Descripción |
 |---|---|---|
-| `GROQ_API_KEY` | — | Groq API key |
-| `TELEGRAM_BOT_TOKEN` | — | Bot token from @BotFather |
-| `TELEGRAM_CHAT_ID` | — | Numeric chat ID to post to |
-| `CRON_SCHEDULE` | `0 8 * * *` | Cron expression (default: 8am daily) |
-| `MAX_AI_CALLS_PER_RUN` | `20` | Max AI calls per pipeline run |
-| `AI_CALL_DELAY_MS` | `1000` | Delay between consecutive AI calls (ms) |
-| `DB_PATH` | `./data/pregonero.db` | SQLite database path |
-| `DRY_RUN` | `false` | Skip Telegram sends and DB writes |
-| `LOG_LEVEL` | `info` | Log level: `debug`, `info`, `warn`, `error` |
+| `GROQ_API_KEY` | — | API key de Groq |
+| `TELEGRAM_BOT_TOKEN` | — | Token del bot de @BotFather |
+| `TELEGRAM_CHAT_ID` | — | Chat ID numérico donde se publica el digest |
+| `CRON_SCHEDULE` | `0 8 * * *` | Expresión cron (por defecto: 8am diario) |
+| `MAX_AI_CALLS_PER_RUN` | `20` | Máximo de llamadas a la IA por ejecución |
+| `AI_CALL_DELAY_MS` | `1000` | Pausa entre llamadas consecutivas a la IA (ms) |
+| `DB_PATH` | `./data/pregonero.db` | Ruta de la base de datos SQLite |
+| `DRY_RUN` | `false` | Omite el envío a Telegram y las escrituras en BD |
+| `LOG_LEVEL` | `info` | Nivel de log: `debug`, `info`, `warn`, `error` |
 
 ## Feeds
 
-Configured in `feeds.json` as an array of `{ url, weight }` objects. Higher weight means proportionally more slots in each run via weighted round-robin.
+Configurados en `feeds.json` como un array de objetos `{ url, weight }`. A mayor peso, más slots proporcionales en cada ejecución mediante round-robin ponderado.
 
-Default sources:
+Fuentes por defecto:
 
-- Hacker News Show HN & top items
+- Hacker News Show HN y top items
 - GitHub Blog
 - Changelog News
 - Reddit: r/programming, r/MachineLearning, r/LocalLLaMA
-- dev.to: tools & AI tags
+- dev.to: tags tools & AI
 - Lobsters (programming)
-- GitHub Trending (daily)
+- GitHub Trending (diario)
 
-## CI / Scheduled runs
+## CI / Ejecución programada
 
-A GitHub Actions workflow (`.github/workflows/daily.yml`) runs the pipeline automatically at **7:00 UTC** every day (8:00 CET). The SQLite database is persisted between runs via `actions/cache` to maintain deduplication state.
+Un workflow de GitHub Actions (`.github/workflows/daily.yml`) ejecuta el pipeline automáticamente a las **7:00 UTC** cada día (8:00 CET). La base de datos SQLite se persiste entre ejecuciones mediante `actions/cache` para mantener el estado de deduplicación.
 
-Required repository secrets: `GROQ_API_KEY`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`.
+Secrets necesarios en el repositorio: `GROQ_API_KEY`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`.
 
-The workflow also supports manual dispatch from the **Actions** tab.
+El workflow también admite lanzamiento manual desde la pestaña **Actions**.
 
-## Project structure
+## Estructura del proyecto
 
 ```
 src/
-  index.ts      — entry point, cron scheduler
-  runner.ts     — main pipeline orchestrator
-  fetcher.ts    — RSS fetch and parsing (24h cutoff)
-  ai.ts         — Groq LLM classifier
-  telegram.ts   — Telegram digest formatting and sending
-  db.ts         — SQLite persistence
-  config.ts     — environment config
-  logger.ts     — structured logger
-feeds.json      — RSS feed list with weights
+  index.ts      — punto de entrada, scheduler cron
+  runner.ts     — orquestador principal del pipeline
+  fetcher.ts    — fetch y parseo de RSS (filtro de 24h)
+  ai.ts         — clasificador LLM con Groq
+  telegram.ts   — formato y envío del digest a Telegram
+  db.ts         — persistencia SQLite
+  config.ts     — configuración por variables de entorno
+  logger.ts     — logger estructurado
+feeds.json      — lista de feeds RSS con pesos
 .github/
   workflows/
-    daily.yml   — scheduled GitHub Actions workflow
+    daily.yml   — workflow programado en GitHub Actions
 ```
 
-## Tech stack
+## Stack tecnológico
 
 - **Runtime**: Bun
-- **AI**: Groq (`llama-3.3-70b-versatile`) via groq-sdk
+- **IA**: Groq (`llama-3.3-70b-versatile`) via groq-sdk
 - **Telegram**: grammY
-- **Database**: Bun SQLite (built-in)
+- **Base de datos**: Bun SQLite (built-in)
 - **Feeds**: rss-parser
 - **Scheduling**: node-cron / GitHub Actions
