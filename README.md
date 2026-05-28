@@ -1,6 +1,6 @@
 # Pregonero
 
-Automated dev/AI news curation pipeline. Pulls RSS feeds, filters articles with an LLM, and posts a daily digest to a Telegram channel.
+Hay demasiado ruido en internet para seguir el ritmo de la industria tech. Pregonero lo filtra por ti: cada mañana recibe en Telegram un digest con los lanzamientos, herramientas y artículos técnicos que realmente valen la pena — sin tutoriales básicos, sin noticias de negocio, sin ruido.
 
 ```
 RSS feeds → fetch → deduplicate → LLM filter → Telegram digest
