@@ -1,4 +1,4 @@
-const required = ['ANTHROPIC_API_KEY', 'TELEGRAM_BOT_TOKEN', 'TELEGRAM_CHAT_ID'] as const;
+const required = ['GROQ_API_KEY', 'TELEGRAM_BOT_TOKEN', 'TELEGRAM_CHAT_ID'] as const;
 
 for (const key of required) {
   if (!process.env[key]) {
@@ -9,8 +9,8 @@ for (const key of required) {
 }
 
 export const config = Object.freeze({
-  anthropic: {
-    apiKey: process.env.ANTHROPIC_API_KEY!,
+  groq: {
+    apiKey: process.env.GROQ_API_KEY!,
   },
   telegram: {
     token: process.env.TELEGRAM_BOT_TOKEN!,

@@ -1,15 +1,16 @@
 import { config } from './config';
 import { isUrlProcessed, saveItem } from './db';
 import { fetchAllFeeds } from './fetcher';
+import type { Feed } from './fetcher';
 import { evaluateItem, sleep } from './ai';
-import { sendArticle } from './telegram';
+import { sendDigest } from './telegram';
 import { log } from './logger';
 import feedsJson from '../feeds.json';
 
 export async function runPipeline(): Promise<void> {
   log.info('Pipeline run started');
 
-  const feeds: string[] = feedsJson;
+  const feeds = feedsJson as Feed[];
   const allItems = await fetchAllFeeds(feeds);
   log.info(`Fetched ${allItems.length} total items from ${feeds.length} feeds`);
 
@@ -21,7 +22,32 @@ export async function runPipeline(): Promise<void> {
     return;
   }
 
-  const toProcess = newItems.slice(0, config.maxAiCallsPerRun);
+  // Weighted round-robin: feeds with higher weight get proportionally more slots
+  const feedWeights = new Map(feeds.map((f) => [f.url, f.weight]));
+  const byFeed = new Map<string, typeof newItems>();
+  for (const item of newItems) {
+    if (!byFeed.has(item.sourceFeed)) byFeed.set(item.sourceFeed, []);
+    byFeed.get(item.sourceFeed)!.push(item);
+  }
+
+  // Build ticket list: each feed URL repeated by its weight
+  const tickets: string[] = [];
+  for (const feedUrl of byFeed.keys()) {
+    const weight = feedWeights.get(feedUrl) ?? 1;
+    for (let w = 0; w < weight; w++) tickets.push(feedUrl);
+  }
+
+  const interleaved: typeof newItems = [];
+  let ticketIndex = 0;
+  while (interleaved.length < newItems.length) {
+    const feedUrl = tickets[ticketIndex % tickets.length];
+    ticketIndex++;
+    const queue = byFeed.get(feedUrl)!;
+    if (queue.length) interleaved.push(queue.shift()!);
+    if ([...byFeed.values()].every((q) => q.length === 0)) break;
+  }
+
+  const toProcess = interleaved.slice(0, config.maxAiCallsPerRun);
   if (newItems.length > config.maxAiCallsPerRun) {
     log.warn(`Capped at ${config.maxAiCallsPerRun} items (${newItems.length - config.maxAiCallsPerRun} deferred to next run)`);
   }
@@ -29,6 +55,8 @@ export async function runPipeline(): Promise<void> {
   let approved = 0;
   let rejected = 0;
   let errors = 0;
+
+  const approvedItems: Array<{ item: (typeof toProcess)[0]; bullets: string[] }> = [];
 
   for (let i = 0; i < toProcess.length; i++) {
     const item = toProcess[i];
@@ -58,28 +86,34 @@ export async function runPipeline(): Promise<void> {
 
     approved++;
     log.info(`Approved: "${item.title}"`);
+    approvedItems.push({ item, bullets: result.bullets });
+  }
 
+  if (approvedItems.length > 0) {
     if (config.dryRun) {
-      log.info(`[DRY RUN] Would send:\n  ${item.title}\n  ${result.bullets.join('\n  ')}`);
-      continue;
-    }
+      for (const { item, bullets } of approvedItems) {
+        log.info(`[DRY RUN] Would include in digest:\n  ${item.title}\n  ${bullets.join('\n  ')}`);
+      }
+    } else {
+      let telegramMsgId: number | undefined;
+      try {
+        telegramMsgId = await sendDigest(approvedItems);
+        log.info(`Digest sent to Telegram (msg_id=${telegramMsgId}) with ${approvedItems.length} articles`);
+      } catch (err) {
+        log.error(`Telegram digest send failed: ${err}`);
+      }
 
-    let telegramMsgId: number | undefined;
-    try {
-      telegramMsgId = await sendArticle(item, result.bullets);
-      log.debug(`Sent to Telegram (msg_id=${telegramMsgId}): "${item.title}"`);
-    } catch (err) {
-      log.error(`Telegram send failed for "${item.title}": ${err}`);
+      for (const { item, bullets } of approvedItems) {
+        saveItem({
+          url: item.url,
+          title: item.title,
+          sourceFeed: item.sourceFeed,
+          status: 'approved',
+          bullets,
+          telegramMsgId,
+        });
+      }
     }
-
-    saveItem({
-      url: item.url,
-      title: item.title,
-      sourceFeed: item.sourceFeed,
-      status: 'approved',
-      bullets: result.bullets,
-      telegramMsgId,
-    });
   }
 
   log.info(

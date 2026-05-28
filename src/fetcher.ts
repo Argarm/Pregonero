@@ -17,8 +17,11 @@ export async function fetchFeed(feedUrl: string): Promise<FeedItem[]> {
     const feed = await parser.parseURL(feedUrl);
     const items: FeedItem[] = [];
 
+    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
     for (const item of feed.items ?? []) {
       if (!item.link || !item.title) continue;
+      if (item.isoDate && new Date(item.isoDate) < cutoff) continue;
       items.push({
         url: item.link.trim(),
         title: item.title.trim(),
@@ -38,8 +41,13 @@ export async function fetchFeed(feedUrl: string): Promise<FeedItem[]> {
   }
 }
 
-export async function fetchAllFeeds(feedUrls: string[]): Promise<FeedItem[]> {
-  const results = await Promise.allSettled(feedUrls.map(fetchFeed));
+export interface Feed {
+  url: string;
+  weight: number;
+}
+
+export async function fetchAllFeeds(feeds: Feed[]): Promise<FeedItem[]> {
+  const results = await Promise.allSettled(feeds.map((f) => fetchFeed(f.url)));
   const all: FeedItem[] = [];
 
   for (const result of results) {

@@ -1,4 +1,4 @@
-import Anthropic from '@anthropic-ai/sdk';
+import Groq from 'groq-sdk';
 import { config } from './config';
 import { log } from './logger';
 import type { FeedItem } from './fetcher';
@@ -9,24 +9,25 @@ export interface AiResult {
   bullets: string[];
 }
 
-const SYSTEM_PROMPT = `You are a strict content relevance classifier for a software developer news feed.
+const SYSTEM_PROMPT = `You are a strict content relevance classifier for a senior software developer specialized in AI.
 
-Your job: evaluate whether a news item is about a NEW and CONCRETE developer tool, library, framework, runtime, SDK, API, or AI model that developers can USE TODAY or in the near future.
+TARGET READER: A senior software engineer whose work is heavily focused on AI/ML systems. They want to stay sharp technically and grow professionally.
 
 APPROVED criteria (item MUST match at least one):
-- Announcement of a new open-source library, framework, or runtime
-- Release of a new version with significant developer-facing features
-- Launch of a new AI model, AI coding tool, or AI-powered developer product
-- New developer API or SDK from a major platform
-- New CLI tool, build tool, or infrastructure tool relevant to software engineering
+- New AI/ML model, framework, library, or tool that a senior dev can use in production or experimentation
+- Significant release of an AI coding assistant, LLM API, or AI-powered developer tool
+- Deep technical content on AI system design, architecture, or engineering best practices (not beginner tutorials)
+- Soft skills content valuable for senior engineers: technical leadership, engineering communication, decision-making, managing complexity, career growth, mentorship
+- New developer tooling, SDK, or infrastructure that meaningfully improves productivity or system quality
 
 REJECTED criteria (item MUST be rejected if it matches any):
-- Opinion pieces, editorials, or "hot takes"
-- General tech news not directly actionable for a developer (layoffs, funding rounds, market share)
-- Tutorials or how-to articles for already well-known tools
-- Security vulnerability disclosures without a clear developer action item
-- Consumer apps, social media, hardware unrelated to dev
+- Beginner or introductory tutorials for well-known tools
+- Business news without technical substance (funding rounds, acquisitions, layoffs, market share)
+- Consumer tech, hardware, or social media unrelated to software development
+- Opinion pieces or hot takes with no actionable insight
 - Conference schedules, job postings, or industry surveys
+- Security vulnerability disclosures without a clear developer action item
+- Generic productivity content not specific to software engineering
 
 RESPONSE FORMAT:
 You must respond with valid JSON only. No prose before or after. No markdown code fences.
@@ -38,13 +39,15 @@ Schema:
 }
 
 If approved=true, bullets must be exactly 3 strings:
-- What the tool IS (one sentence, max 20 words)
-- The key developer benefit (one sentence, max 20 words)
-- One concrete capability or use case (one sentence, max 20 words)
+- What it IS or what it covers (one sentence, max 20 words)
+- Why it matters for a senior AI-focused developer (one sentence, max 20 words)
+- One concrete takeaway or use case (one sentence, max 20 words)
 
-If approved=false, bullets must be an empty array [].`;
+If approved=false, bullets must be an empty array [].
 
-const client = new Anthropic({ apiKey: config.anthropic.apiKey });
+LANGUAGE: Always write the "reason" field and all "bullets" in Spanish, regardless of the source article's language.`;
+
+const client = new Groq({ apiKey: config.groq.apiKey });
 
 async function callAi(item: FeedItem): Promise<AiResult> {
   const userContent = JSON.stringify({
@@ -53,14 +56,17 @@ async function callAi(item: FeedItem): Promise<AiResult> {
     url: item.url,
   });
 
-  const response = await client.messages.create({
-    model: 'claude-haiku-4-5-20251001',
+  const response = await client.chat.completions.create({
+    model: 'llama-3.3-70b-versatile',
     max_tokens: 300,
-    system: SYSTEM_PROMPT,
-    messages: [{ role: 'user', content: userContent }],
+    response_format: { type: 'json_object' },
+    messages: [
+      { role: 'system', content: SYSTEM_PROMPT },
+      { role: 'user', content: userContent },
+    ],
   });
 
-  const text = (response.content[0] as { text: string }).text.trim();
+  const text = response.choices[0].message.content?.trim() ?? '';
   const parsed = JSON.parse(text) as AiResult;
 
   if (typeof parsed.approved !== 'boolean' || !Array.isArray(parsed.bullets)) {

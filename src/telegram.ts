@@ -10,20 +10,6 @@ function escapeHtml(text: string): string {
     .replace(/>/g, '&gt;');
 }
 
-function formatMessage(item: FeedItem, bullets: string[]): string {
-  const escapedTitle = escapeHtml(item.title);
-  const escapedBullets = bullets.map((b) => `• ${escapeHtml(b)}`).join('\n');
-  const escapedUrl = item.url;
-
-  return [
-    `<b>🔧 ${escapedTitle}</b>`,
-    '',
-    escapedBullets,
-    '',
-    `<a href="${escapedUrl}">Leer más →</a>`,
-  ].join('\n');
-}
-
 let _bot: Bot | null = null;
 
 export function getBot(): Bot {
@@ -31,8 +17,7 @@ export function getBot(): Bot {
   return _bot;
 }
 
-export async function sendArticle(item: FeedItem, bullets: string[]): Promise<number> {
-  const text = formatMessage(item, bullets);
+async function sendText(text: string): Promise<number> {
   const delays = [5000, 15000, 45000];
 
   for (let attempt = 0; attempt <= delays.length; attempt++) {
@@ -40,7 +25,7 @@ export async function sendArticle(item: FeedItem, bullets: string[]): Promise<nu
       const msg = await getBot().api.sendMessage(config.telegram.chatId, text, {
         parse_mode: 'HTML',
         // @ts-ignore — link_preview_options available in Bot API 7.0+
-        link_preview_options: { is_disabled: false },
+        link_preview_options: { is_disabled: true },
       });
       return msg.message_id;
     } catch (err) {
@@ -54,4 +39,40 @@ export async function sendArticle(item: FeedItem, bullets: string[]): Promise<nu
   }
 
   throw new Error('Unreachable');
+}
+
+const MAX_MSG_LEN = 4000;
+
+export async function sendDigest(entries: Array<{ item: FeedItem; bullets: string[] }>): Promise<number> {
+  const date = new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
+  const header = `🗞 <b>Dev News — ${date}</b>`;
+
+  const blocks = entries.map(({ item, bullets }) => {
+    const title = escapeHtml(item.title);
+    const bulletLines = bullets.map((b) => `• ${escapeHtml(b)}`).join('\n');
+    return `🔧 <b>${title}</b>\n${bulletLines}\n<a href="${item.url}">Leer más →</a>`;
+  });
+
+  // Split into chunks that respect Telegram's 4096-char limit
+  const chunks: string[] = [];
+  let current = header;
+
+  for (const block of blocks) {
+    const candidate = `${current}\n\n${block}`;
+    if (candidate.length > MAX_MSG_LEN && current !== header) {
+      chunks.push(current);
+      current = block;
+    } else {
+      current = candidate;
+    }
+  }
+  chunks.push(current);
+
+  let firstMsgId: number | undefined;
+  for (const chunk of chunks) {
+    const msgId = await sendText(chunk);
+    if (firstMsgId === undefined) firstMsgId = msgId;
+  }
+
+  return firstMsgId!;
 }

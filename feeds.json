@@ -1,14 +1,13 @@
 [
-  "https://hnrss.org/show",
-  "https://hnrss.org/newest?q=tool+OR+library+OR+framework+OR+release&points=30",
-  "https://github.blog/feed/",
-  "https://www.anthropic.com/rss.xml",
-  "https://changelog.com/news/feed",
-  "https://www.reddit.com/r/programming/.rss",
-  "https://www.reddit.com/r/MachineLearning/.rss",
-  "https://www.reddit.com/r/LocalLLaMA/.rss",
-  "https://dev.to/feed/tag/tools",
-  "https://dev.to/feed/tag/ai",
-  "https://lobste.rs/t/programming.rss",
-  "https://mshibanami.github.io/GitHubTrendingRSS/daily/all.xml"
+  { "url": "https://hnrss.org/show",                                                          "weight": 1 },
+  { "url": "https://hnrss.org/newest?q=tool+OR+library+OR+framework+OR+release&points=30",   "weight": 3 },
+  { "url": "https://github.blog/feed/",                                                       "weight": 3 },
+  { "url": "https://changelog.com/news/feed",                                                 "weight": 3 },
+  { "url": "https://dev.to/feed/tag/tools",                                                   "weight": 3 },
+  { "url": "https://lobste.rs/t/programming.rss",                                             "weight": 2 },
+  { "url": "https://mshibanami.github.io/GitHubTrendingRSS/daily/all.xml",                   "weight": 2 },
+  { "url": "https://dev.to/feed/tag/ai",                                                      "weight": 2 },
+  { "url": "https://www.reddit.com/r/programming/.rss",                                       "weight": 1 },
+  { "url": "https://www.reddit.com/r/MachineLearning/.rss",                                   "weight": 1 },
+  { "url": "https://www.reddit.com/r/LocalLLaMA/.rss",                                        "weight": 1 }
 ]
