@@ -1,7 +1,7 @@
 {
   "name": "pregonero",
   "version": "1.0.0",
-  "description": "Automated dev/AI news curation — RSS to Telegram via Claude Haiku",
+  "description": "LLM-filtered RSS digest bot — fetch, deduplicate, classify with Groq, publish to Telegram",
   "scripts": {
     "start": "bun src/index.ts",
     "dev": "bun --watch src/index.ts",
